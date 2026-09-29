@@ -232,44 +232,53 @@ function atualizarClipPathOverlay() {
   if (telaProjetorMeshes.length === 0) return;
 
   const slidePlane = telaProjetorMeshes[0];
+  slidePlane.updateMatrixWorld(true);
+
   const w = sizes.width;
   const h = sizes.height;
 
-  // Os 4 cantos do PlaneGeometry 4.6x2.59 em espaço local,
-  // convertidos para world usando a matrix da mesh
-  const hw = 4.6 / 2;  // half-width
-  const hh = 2.59 / 2; // half-height
+  // Os 4 cantos do PlaneGeometry 4.6x2.59 em espaço local.
+  // A mesh tem rotation.z = Math.PI, então os cantos em espaço local
+  // são invertidos — projetamos direto via matrixWorld para obter
+  // os pontos corretamente em perspectiva.
+  const hw = 4.6 / 2;
+  const hh = 2.59 / 2;
+  const margin = 16; // px de folga ao redor do slide
 
-  // Cantos em espaço local (o plano está em XY local após rotação)
-  const corners = [
+  // Ordem: topo-esq, topo-dir, baixo-dir, baixo-esq (sentido anti-horário)
+  // para criar um "furo" correto no clip-path via even-odd rule
+  const pts = [
     new THREE.Vector3(-hw,  hh, 0),
     new THREE.Vector3( hw,  hh, 0),
     new THREE.Vector3( hw, -hh, 0),
     new THREE.Vector3(-hw, -hh, 0),
-  ].map(c => {
-    c.applyMatrix4(slidePlane.matrixWorld);
-    return projectToScreen(c, camera, w, h);
+  ].map(v => {
+    v.applyMatrix4(slidePlane.matrixWorld);
+    return projectToScreen(v, camera, w, h);
   });
 
-  // Adiciona margem de 12px ao redor do slide para não cortar as bordas
-  const margin = 12;
-  const minX = Math.min(...corners.map(c => c.x)) - margin;
-  const minY = Math.min(...corners.map(c => c.y)) - margin;
-  const maxX = Math.max(...corners.map(c => c.x)) + margin;
-  const maxY = Math.max(...corners.map(c => c.y)) + margin;
+  // Expande cada ponto para fora do centro do polígono pela margem
+  const cx = pts.reduce((s, p) => s + p.x, 0) / 4;
+  const cy = pts.reduce((s, p) => s + p.y, 0) / 4;
+  const expanded = pts.map(p => {
+    const dx = p.x - cx;
+    const dy = p.y - cy;
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+    return {
+      x: p.x + (dx / len) * margin,
+      y: p.y + (dy / len) * margin,
+    };
+  });
 
-  // clip-path com "buraco" retangular: cobre tudo EXCETO o slide
-  // Usa a regra do polígono com sentido oposto para criar o furo
-  overlay.style.clipPath = `
-    polygon(
-      0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%,
-      ${minX}px ${minY}px,
-      ${minX}px ${maxY}px,
-      ${maxX}px ${maxY}px,
-      ${maxX}px ${minY}px,
-      ${minX}px ${minY}px
-    )
-  `;
+  // clip-path: contorno externo (tela toda, sentido horário)
+  // + contorno interno do slide (sentido anti-horário = furo)
+  // CSS clip-path usa a regra nonzero: sentidos opostos criam o buraco
+  const outer = `0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%`;
+  const inner = expanded.map(p => `${p.x.toFixed(1)}px ${p.y.toFixed(1)}px`).join(', ');
+  // Fecha o polígono interno repetindo o primeiro ponto
+  const p0 = `${expanded[0].x.toFixed(1)}px ${expanded[0].y.toFixed(1)}px`;
+
+  overlay.style.clipPath = `polygon(${outer}, ${inner}, ${p0})`;
 }
 
 function apagarLuzes() {
@@ -295,19 +304,26 @@ let portaMeshes = [];    // meshes clicáveis da porta
 let portaPivot = null;   // Group com pivot no batente
 let portaAberta = false;
 let portaAnimando = false;
+let vaoPorta = null;     // plano claro do vão da porta (oculto quando fechada)
 
 function abrirFecharPorta() {
   if (portaAnimando || !portaPivot) return;
   portaAnimando = true;
 
-  const alvo = portaAberta ? 0 : -Math.PI / 2;
+  const abrindo = !portaAberta;
+  const alvo = abrindo ? Math.PI / 2 : 0;
+
+  // Mostra o vao ao comecar a abrir
+  if (abrindo && vaoPorta) vaoPorta.visible = true;
 
   gsap.to(portaPivot.rotation, {
     y: alvo,
     duration: 1.0,
     ease: "power2.inOut",
     onComplete: () => {
-      portaAberta = !portaAberta;
+      // Esconde o vao quando a porta termina de fechar
+      if (!abrindo && vaoPorta) vaoPorta.visible = false;
+      portaAberta = abrindo;
       portaAnimando = false;
     }
   });
@@ -317,31 +333,10 @@ function abrirFecharPorta() {
 // VENTILADOR — ANIMAÇÃO DAS HÉLICES
 // =====================================================
 
-let helicesMeshes = [];   // meshes das hélices
-let helicesPivot = null;  // Group pivot centralizado nas hélices
-let fanLigado = false;    // estado: ligado ou desligado
-let fanVelocidade = { rpm: 0 }; // velocidade atual (animada pelo GSAP)
-const FAN_RPM_MAX = 300;  // RPM máximo (giros por minuto, realista ~200-400)
-
-function ligarDesligarVentilador() {
-  if (fanLigado) {
-    // Desligar: desacelera gradualmente até parar (inércia real)
-    gsap.to(fanVelocidade, {
-      rpm: 0,
-      duration: 3.5,
-      ease: "power2.in",
-      onComplete: () => { fanLigado = false; }
-    });
-  } else {
-    // Ligar: acelera gradualmente (motor real demora ~1.5s para atingir velocidade)
-    fanLigado = true;
-    gsap.to(fanVelocidade, {
-      rpm: FAN_RPM_MAX,
-      duration: 1.8,
-      ease: "power2.out"
-    });
-  }
-}
+let helicesMeshes = [];  // meshes das hélices detectadas no GLB
+let helicesPivot = null; // Group com pivot no centro das hélices
+let helicesRotationAxis = null;
+const HELICES_ANGULAR_SPEED = Math.PI * 2; // uma volta por segundo
 
 // Clique unificado: slide OU porta
 canvas.addEventListener("click", (e) => {
@@ -366,14 +361,6 @@ canvas.addEventListener("click", (e) => {
     }
   }
 
-  // Ventilador
-  if (helicesMeshes.length > 0) {
-    const intersectsHelices = raycaster.intersectObjects(helicesMeshes, true);
-    if (intersectsHelices.length > 0) {
-      ligarDesligarVentilador();
-      return;
-    }
-  }
 });
 
 // Cursor pointer
@@ -388,12 +375,8 @@ canvas.addEventListener("mousemove", (e) => {
     ? raycaster.intersectObjects(portaMeshes, true)
     : [];
 
-  const intersectsHelicesCursor = helicesMeshes.length > 0
-    ? raycaster.intersectObjects(helicesMeshes, true)
-    : [];
-
   canvas.style.cursor =
-    intersectsSlide.length > 0 || intersectsPorta.length > 0 || intersectsHelicesCursor.length > 0
+    intersectsSlide.length > 0 || intersectsPorta.length > 0
       ? "pointer"
       : "default";
 });
@@ -507,15 +490,6 @@ loader.load("/models/salaDeAula-v1.glb", (glb) => {
       portaCandidates.push(child);
     }
 
-    // Detecta hélices do ventilador
-    const isHelice =
-      childNameLower.startsWith("helices") ||
-      parentNameLower.startsWith("helices");
-
-    if (isHelice) {
-      helicesMeshes.push(child);
-      console.log("🌀 Hélice encontrada:", child.name);
-    }
   });
 
   // --- Monta pivot da porta ---
@@ -569,72 +543,81 @@ loader.load("/models/salaDeAula-v1.glb", (glb) => {
       portaMeshes.push(mesh);
       console.log("🚪 Mesh de porta adicionada ao pivot:", mesh.name);
     });
+
+    // Plano claro no vão da porta — aparece quando a porta abre
+    const vaoGeo = new THREE.PlaneGeometry(portaSize.x, portaSize.y);
+    const vaoMat = new THREE.MeshBasicMaterial({
+      color: 0xe8e0d0,
+      side: THREE.DoubleSide,
+    });
+    const vaoPlane = new THREE.Mesh(vaoGeo, vaoMat);
+    vaoPlane.position.set(
+      portaCenter.x,
+      portaCenter.y,
+      box.max.z + 0.02
+    );
+    vaoPlane.visible = false; // oculto enquanto a porta estiver fechada
+    scene.add(vaoPlane);
+    vaoPorta = vaoPlane;
+    console.log("Vao da porta em:", vaoPlane.position);
   }
 
-  // --- Monta pivot das hélices ---
+  // --- Localiza a mesh das hélices pelo nome exato ---
+  // Só captura a mesh cuja geometry é a das pás — ignora motor e base.
+  // O nome no Blender é "helices" (ou começa com "helices" diretamente,
+  // sem ser filho de outro objeto chamado "helices").
+  glb.scene.traverse((child) => {
+    if (!child.isMesh) return;
+    const n = child.name.toLowerCase();
+    // Aceita apenas a mesh cujo PRÓPRIO nome começa com "helices"
+    // e cujo parent NÃO é também "helices" (evita filhos como motor/base)
+    const parentN = child.parent?.name?.toLowerCase() || "";
+    const isHelicesPropria = n.startsWith("helices") && !parentN.startsWith("helices");
+    if (isHelicesPropria) {
+      helicesMeshes.push(child);
+      console.log('Helice encontrada:', child.name, '| parent:', child.parent?.name);
+    }
+  });
+
   if (helicesMeshes.length > 0) {
-    // Estratégia: para cada mesh de hélice, centralizar a geometria no origin
-    // da própria mesh (geometry.center()), e compensar o deslocamento na posição.
-    // Isso garante que mesh.rotation gira exatamente no centro geométrico da hélice,
-    // sem depender de um pivot externo que pode ficar deslocado pela carcaça.
+    // Calcula o centro world das hélices para o pivot
+    const bbox = new THREE.Box3();
+    helicesMeshes.forEach(m => { m.updateWorldMatrix(true, false); bbox.expandByObject(m); });
+    const centro = new THREE.Vector3();
+    bbox.getCenter(centro);
 
-    helicesMeshes.forEach(mesh => {
-      mesh.updateWorldMatrix(true, false);
-
-      // Calcula o centro da geometria em espaço local
-      mesh.geometry.computeBoundingBox();
-      const geomCenter = new THREE.Vector3();
-      mesh.geometry.boundingBox.getCenter(geomCenter);
-
-      // Desloca a geometria para que seu centro fique na origem local
-      mesh.geometry.translate(-geomCenter.x, -geomCenter.y, -geomCenter.z);
-
-      // Compensa na posição da mesh para manter a posição visual intacta
-      // (geomCenter está em espaço local, precisa ser convertido para world)
-      const offset = geomCenter.clone().applyMatrix4(mesh.matrixWorld);
-      const worldPos = new THREE.Vector3();
-      mesh.getWorldPosition(worldPos);
-      // A nova posição world da mesh deve ser worldPos + offset_local_em_world
-      // Mas como só translatemos a geometria, a mesh.position não mudou —
-      // precisamos deslocar a posição da mesh pelo centro local transformado
-      const localOffset = geomCenter.clone()
-        .applyQuaternion(mesh.quaternion)
-        .multiply(mesh.scale);
-      mesh.position.add(localOffset);
-
-      console.log("🌀 Hélice centralizada:", mesh.name, "offset:", geomCenter);
-    });
-
-    // Agrupa num pivot único para rotacionar tudo junto
-    const boxHelices = new THREE.Box3();
-    helicesMeshes.forEach(mesh => {
-      mesh.updateWorldMatrix(true, false);
-      boxHelices.expandByObject(mesh);
-    });
-    const centroHelices = new THREE.Vector3();
-    boxHelices.getCenter(centroHelices);
-
+    // Cria o pivot no centro das hélices
     helicesPivot = new THREE.Group();
-    helicesPivot.position.copy(centroHelices);
+    helicesPivot.position.copy(centro);
     scene.add(helicesPivot);
 
-    helicesMeshes.forEach(mesh => {
-      const worldPos = new THREE.Vector3();
-      mesh.getWorldPosition(worldPos);
-      const worldQuat = new THREE.Quaternion();
-      mesh.getWorldQuaternion(worldQuat);
-      const worldScale = new THREE.Vector3();
-      mesh.getWorldScale(worldScale);
+    // Reparenta SOMENTE as meshes de hélice para o pivot
+    helicesMeshes.forEach(m => {
+      m.updateWorldMatrix(true, false);
+      const wPos = new THREE.Vector3();
+      const wQuat = new THREE.Quaternion();
+      const wScale = new THREE.Vector3();
+      m.getWorldPosition(wPos);
+      m.getWorldQuaternion(wQuat);
+      m.getWorldScale(wScale);
 
-      mesh.parent.remove(mesh);
-      helicesPivot.add(mesh);
+      m.parent.remove(m);
+      helicesPivot.add(m);
 
-      mesh.position.copy(worldPos.clone().sub(centroHelices));
-      mesh.quaternion.copy(worldQuat);
-      mesh.scale.copy(worldScale);
+      m.position.subVectors(wPos, centro);
+      m.quaternion.copy(wQuat);
+      m.scale.copy(wScale);
+
+      // No GLB, a espessura das pás está no eixo local X. Convertemos esse
+      // eixo para world space antes de separar a mesh de sua hierarquia.
+      if (!helicesRotationAxis) {
+        helicesRotationAxis = new THREE.Vector3(1, 0, 0)
+          .applyQuaternion(wQuat)
+          .normalize();
+      }
     });
 
-    console.log("🌀 Pivot das hélices em:", centroHelices);
+    console.log('Pivot das helices em:', centro, '| total meshes:', helicesMeshes.length);
   }
 
   // --- Traverse normal para texturas ---
@@ -771,10 +754,13 @@ const clock = new THREE.Clock();
 function animate() {
   const delta = clock.getDelta(); // segundos desde o último frame
 
-  // Rotação das hélices: converte RPM -> radianos/segundo -> radianos/frame
-  if (helicesPivot && fanVelocidade.rpm > 0) {
-    const radPerSec = (fanVelocidade.rpm / 60) * Math.PI * 2;
-    helicesPivot.rotation.x += radPerSec * delta;
+  // Rotação contínua das hélices no sentido horário.
+  // O sinal negativo produz a rotação horária quando observada de frente.
+  if (helicesPivot && helicesRotationAxis) {
+    helicesPivot.rotateOnWorldAxis(
+      helicesRotationAxis,
+      -HELICES_ANGULAR_SPEED * delta
+    );
   }
 
   // Atualiza clip-path do overlay para manter o slide sempre iluminado
