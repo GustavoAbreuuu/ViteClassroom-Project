@@ -72,6 +72,7 @@ Navegador
   - Three.js: biblioteca responsável pela criação da cena, câmera, carregamento de modelos e renderização 3D.
   - WebGL: tecnologia que permite a renderização gráfica acelerada por hardware no navegador.
   - DRACO Loader: suporte ao carregamento de modelos 3D compactados.
+    
 ### Desenvolvimento web
   - JavaScript (ES Modules): lógica da aplicação, eventos, animações e interações.
 - HTML5: estrutura da página.
@@ -94,3 +95,63 @@ Para manter um desempenho adequado no navegador, o projeto considera técnicas c
 - Reutilização e redução de texturas.
 - Uso de baking, convertendo detalhes visuais e iluminação em texturas estáticas.
 - Carregamento de modelo GLB compactado com DRACO.
+
+## Estrutura do Projeto
+
+```text
+vite-project/
+├── public/
+│   ├── draco/                 # Decodificadores DRACO
+│   ├── models/                # Modelo 3D da sala em GLB
+│   └── textures/              # Texturas do ambiente e slides
+├── src/
+│   ├── assets/                # Recursos da interface
+│   ├── main.js                # Cena, interações e animações Three.js
+│   └── style.scss             # Estilos da aplicação
+├── index.html                 # Página principal
+├── package.json               # Dependências e scripts
+└── vite.config.js             # Configuração do Vite
+```
+
+##👨‍💻 Como rodar o projeto localmente
+
+### 1. Clone o repositório:
+```text
+git clone https://github.com/GustavoAbreuuu/ViteClassroom-Project.git
+```
+## 2. Acesse a pasta do projeto:
+```text
+cd ViteClassroom-Project
+```
+
+### 3. Instale as dependências:
+```text
+npm install
+```
+### 4. Inicie o ambiente de desenvolvimento:
+```text
+npm run dev
+```
+### 5. Abra a URL exibida no terminal, normalmente:
+```text
+http://localhost:5173/
+```
+
+### 6. Inicie o ambiente de desenvolvimento:
+```text
+npm run dev
+```
+
+### 7. Abra a URL exibida no terminal, normalmente:
+```text
+http://localhost:5173/
+```
+📦 Gerar build de produção
+```text
+npm run build
+```
+
+### Para visualizar a build localmente:
+```text
+npm run preview
+```
