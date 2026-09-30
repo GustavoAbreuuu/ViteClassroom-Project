@@ -1,12 +1,10 @@
-<img width="1627" height="767" alt="Captura de tela 2026-09-30 192118" src="https://github.com/user-attachments/assets/ae1f6def-4149-4ffd-a2e9-e61feae92608" /># ViteClassroom-Project
-
 # 🏫 Sala de Aula 3D
 
 **Sala de Aula 3D** é uma experiência interativa desenvolvida para simular, em ambiente tridimensional, a sala de aula da unidade curricular de Computação Gráfica da Universidade do Sul de Santa Catarina (UNISUL), campus Dib Mussi.
 
 O projeto permite explorar virtualmente o ambiente, navegar pela cena e interagir com elementos do espaço. Seu desenvolvimento aplica conceitos de modelagem 3D, transformações geométricas, renderização em tempo real e interação por raycasting diretamente no navegador.
 
-> 🔗 **Projeto online: vite-classroom-project-kvkxm07i0-gustavos-projects-b0404bfd.vercel.app**.
+> 🔗 **Projeto online:** [vite-classroom-project-kvkxm07i0-gustavos-projects-b0404bfd.vercel.app](https://vite-classroom-project-kvkxm07i0-gustavos-projects-b0404bfd.vercel.app/).
 
 ## 🎬 Demonstração do Projeto
 
