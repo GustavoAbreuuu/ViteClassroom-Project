@@ -44,10 +44,7 @@ dracoLoader.setDecoderPath('/draco/');
 const loader = new GLTFLoader();
 loader.setDRACOLoader(dracoLoader);
 
-// =====================================================
 // SLIDES
-// =====================================================
-
 const slidePaths = [
   "/textures/slides/slide01.webp",
   "/textures/slides/slide02.webp",
@@ -97,10 +94,7 @@ window.addEventListener("keydown", (e) => {
   if (e.key === "ArrowLeft") changeSlide(-1);
 });
 
-// =====================================================
 // UI: indicador de slide + hint
-// =====================================================
-
 const uiContainer = document.createElement("div");
 uiContainer.style.cssText = `
   position: fixed;
@@ -160,10 +154,8 @@ function updateSlideUI() {
   });
 }
 
-// =====================================================
-// OVERLAY DE "LUZES APAGADAS"
-// =====================================================
 
+// Overlay de luzes apagadas
 let luzApagada = false;
 let overlayOpacity = 0; // controlado por GSAP para suavidade no clip-path
 
@@ -289,17 +281,11 @@ function apagarLuzes() {
   btnLuz.style.pointerEvents = "auto";
 }
 
-// =====================================================
 // RAYCASTER
-// =====================================================
-
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
-// =====================================================
-// PORTA — ANIMAÇÃO DE ABERTURA
-// =====================================================
-
+// PORTA — Animação de abertura
 let portaMeshes = [];    // meshes clicáveis da porta
 let portaPivot = null;   // Group com pivot no batente
 let portaAberta = false;
@@ -329,10 +315,7 @@ function abrirFecharPorta() {
   });
 }
 
-// =====================================================
-// VENTILADOR — ANIMAÇÃO DAS HÉLICES
-// =====================================================
-
+// VENTILADOR - Animação das hélices
 let helicesMeshes = [];  // meshes das hélices detectadas no GLB
 let helicesPivot = null; // Group com pivot no centro das hélices
 let helicesRotationAxis = null;
@@ -381,10 +364,8 @@ canvas.addEventListener("mousemove", (e) => {
       : "default";
 });
 
-// =====================================================
-// MAPEAMENTO DE TEXTURAS
-// =====================================================
 
+// MAPEAMENTO DE TEXTURAS
 const textureMap = [
   {
     path: "/textures/room/texture_set01.webp",
@@ -461,15 +442,13 @@ function getTextureEntryForNode(nodeName) {
   return null;
 }
 
-// =====================================================
-// CARREGAMENTO DO GLB
-// =====================================================
 
+// CARREGAMENTO DO GLB
 loader.load("/models/salaDeAula-v1.glb", (glb) => {
 
   const unmatched = [];
 
-  // --- Coleta meshes da porta antes de atravessar ---
+  // Coleta meshes da porta antes de atravessar
   // Precisamos do bounding box para criar o pivot correto
   const portaCandidates = [];
 
@@ -492,7 +471,7 @@ loader.load("/models/salaDeAula-v1.glb", (glb) => {
 
   });
 
-  // --- Monta pivot da porta ---
+  // Monta pivot da porta
   if (portaCandidates.length > 0) {
     // Calcula bounding box global de todas as meshes da porta
     const box = new THREE.Box3();
@@ -562,7 +541,7 @@ loader.load("/models/salaDeAula-v1.glb", (glb) => {
     console.log("Vao da porta em:", vaoPlane.position);
   }
 
-  // --- Localiza a mesh das hélices pelo nome exato ---
+  // Localiza a mesh das hélices pelo nome exato 
   // Só captura a mesh cuja geometry é a das pás — ignora motor e base.
   // O nome no Blender é "helices" (ou começa com "helices" diretamente,
   // sem ser filho de outro objeto chamado "helices").
@@ -620,7 +599,7 @@ loader.load("/models/salaDeAula-v1.glb", (glb) => {
     console.log('Pivot das helices em:', centro, '| total meshes:', helicesMeshes.length);
   }
 
-  // --- Traverse normal para texturas ---
+  // Traverse normal para texturas
   glb.scene.traverse((child) => {
     if (!child.isMesh) return;
 
@@ -752,7 +731,7 @@ window.addEventListener("resize", () => {
 const clock = new THREE.Clock();
 
 function animate() {
-  const delta = clock.getDelta(); // segundos desde o último frame
+  const delta = clock.getDelta(); // Segundos desde o último frame
 
   // Rotação contínua das hélices no sentido horário.
   // O sinal negativo produz a rotação horária quando observada de frente.
