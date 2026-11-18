@@ -5,6 +5,7 @@
 O projeto permite explorar virtualmente o ambiente, navegar pela cena e interagir com elementos do espaço. Seu desenvolvimento aplica conceitos de modelagem 3D, transformações geométricas, renderização em tempo real e interação por raycasting diretamente no navegador.
 
 > 🔗 **[Clique aqui para acessar o projeto online](https://vite-classroom-project.vercel.app/).**
+> Costuma levar 3 a 5 segundos para renderizar
 
 ## 🎬 Demonstração do Projeto
 
